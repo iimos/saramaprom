@@ -1,5 +1,6 @@
-// Code is based on https://github.com/deathowl/go-metrics-prometheus package.
 package saramaprom
+
+// This code is based on a code of https://github.com/deathowl/go-metrics-prometheus library.
 
 import (
 	"fmt"
@@ -46,7 +47,7 @@ func (c *exporter) gaugeFromNameAndValue(name string, val float64) error {
 		return nil
 	}
 
-	if _, exists := c.gauges[shortName]; !exists {
+	if _, exists := c.gauges[name]; !exists {
 		labelNames := make([]string, 0, len(labels))
 		for labelName := range labels {
 			labelNames = append(labelNames, labelName)
@@ -71,10 +72,10 @@ func (c *exporter) gaugeFromNameAndValue(name string, val float64) error {
 				return err
 			}
 		}
-		c.gauges[shortName] = g.With(labels)
+		c.gauges[name] = g.With(labels)
 	}
 
-	c.gauges[shortName].Set(val)
+	c.gauges[name].Set(val)
 	return nil
 }
 
