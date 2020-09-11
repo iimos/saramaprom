@@ -9,6 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// Options holds optional params for ExportMetrics.
 type Options struct {
 	// PrometheusRegistry is prometheus registry. Default prometheus.DefaultRegisterer.
 	PrometheusRegistry prometheus.Registerer
@@ -31,7 +32,7 @@ type Options struct {
 	Debug bool
 }
 
-// ExportMetric exports metrics from metricsRegistry to prometheus registry.
+// ExportMetrics exports metrics from go-metrics to prometheus.
 func ExportMetrics(ctx context.Context, metricsRegistry MetricsRegistry, opt Options) error {
 	if opt.PrometheusRegistry == nil {
 		opt.PrometheusRegistry = prometheus.DefaultRegisterer
@@ -84,6 +85,8 @@ func ExportMetrics(ctx context.Context, metricsRegistry MetricsRegistry, opt Opt
 	return nil
 }
 
+// MetricsRegistry is an interface for 'github.com/rcrowley/go-metrics'.Registry
+// which is used for metrics in sarama.
 type MetricsRegistry interface {
 	Each(func(name string, i interface{}))
 }

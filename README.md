@@ -1,8 +1,16 @@
 # saramaprom
-This is a prometheus metrics reporter for the sarama library. 
-It is based on is based on https://github.com/deathowl/go-metrics-prometheus library.
+[![GoDoc](https://godoc.org/github.com/iimos/saramaprom?status.png)](http://godoc.org/github.com/iimos/saramaprom)
+[![Go Report](https://goreportcard.com/badge/github.com/iimos/saramaprom)](https://goreportcard.com/report/github.com/iimos/saramaprom)
 
-Usage:
+This is a prometheus metrics reporter for the [sarama](https://github.com/Shopify/sarama) library. 
+It is based on https://github.com/deathowl/go-metrics-prometheus library.
+
+## Installation
+```console
+go get github.com/iimos/saramaprom
+```
+
+## Usage
 
 ```go
 import (
@@ -40,3 +48,7 @@ type Options struct {
 	Debug bool
 }
 ```
+
+## Requirements
+
+Go 1.13 or above.
