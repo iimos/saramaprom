@@ -5,6 +5,9 @@
 This is a prometheus metrics reporter for the [sarama](https://github.com/Shopify/sarama) library. 
 It is based on https://github.com/deathowl/go-metrics-prometheus library.
 
+## Why
+Because `go-metrics-prometheus` is a general solution it reports metrics with no labels so it's hard to use. Thus a sarama specific solution was made, it reports metrics with labels for brokers, topics and consumer/producer instance.
+
 ## Installation
 ```console
 go get github.com/iimos/saramaprom
@@ -48,6 +51,37 @@ type Options struct {
 	Debug bool
 }
 ```
+
+Metric names by default:
+```
+Gauges:
+sarama_batch_size
+sarama_compression_ratio
+sarama_incoming_byte_rate
+sarama_outgoing_byte_rate
+sarama_record_send_rate
+sarama_records_per_request
+sarama_request_latency_in_ms
+sarama_request_rate
+sarama_request_size
+sarama_requests_in_flight
+sarama_response_rate
+sarama_response_size
+
+Histograms:
+sarama_batch_size_histogram
+sarama_compression_ratio_histogram
+sarama_records_per_request_histogram
+sarama_request_latency_in_ms_histogram
+sarama_request_size_histogram
+sarama_response_size_histogram
+```
+
+Every metric have three labels:
+* broker – kafka broker id
+* topic – kafka topic name
+* label – custom label to distinguish different consumers/producers
+
 
 ## Requirements
 
