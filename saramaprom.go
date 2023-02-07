@@ -77,6 +77,9 @@ func ExportMetrics(ctx context.Context, metricsRegistry MetricsRegistry, opt Opt
 					opt.OnError(err)
 				}
 			case <-ctx.Done():
+				if err := exp.unregisterGauges(); err != nil {
+					opt.OnError(err)
+				}
 				return
 			}
 		}

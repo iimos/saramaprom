@@ -79,6 +79,18 @@ func (c *exporter) gaugeFromNameAndValue(name string, val float64) error {
 	return nil
 }
 
+// unregisterGauges will remove the gauge metrics so that they do not show
+// incorrect values after the application has been shut down.
+func (c *exporter) unregisterGauges() error {
+	for _, g := range c.gauges {
+		if ok := c.promRegistry.Unregister(g); !ok {
+			return fmt.Errorf("unable to unregister prometheus collector")
+		}
+	}
+
+	return nil
+}
+
 func (c *exporter) metricNameAndLabels(metricName string) (newName string, labels map[string]string, skip bool) {
 	newName, broker, topic := parseMetricName(metricName)
 	if broker == "" && topic == "" {
