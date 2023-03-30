@@ -1,17 +1,15 @@
 package saramaprom_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/iimos/saramaprom"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/iimos/saramaprom"
 )
 
 func TestMetricCreation(t *testing.T) {
@@ -21,10 +19,7 @@ func TestMetricCreation(t *testing.T) {
 	err := metricsRegistry.Register("counter-for-broker-123", metrics.NewCounter())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	err = saramaprom.ExportMetrics(ctx, metricsRegistry, saramaprom.Options{
+	saramaprom.ExportMetrics(metricsRegistry, saramaprom.Options{
 		Namespace:          "test",
 		Subsystem:          "subsys",
 		PrometheusRegistry: promRegistry,
@@ -55,16 +50,11 @@ func TestLabels(t *testing.T) {
 	err = metricsRegistry.Register("skip-counter", metrics.NewCounter())
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	err = saramaprom.ExportMetrics(ctx, metricsRegistry, saramaprom.Options{
+	saramaprom.ExportMetrics(metricsRegistry, saramaprom.Options{
 		Namespace:          "test",
 		Subsystem:          "subsys",
-		Label:              "test-label",
 		PrometheusRegistry: promRegistry,
 	})
-	require.NoError(t, err)
 
 	t.Run("counter1-for-broker-123", func(t *testing.T) {
 		want := []gaugeDetails{{
@@ -98,14 +88,11 @@ func TestMetricUpdate(t *testing.T) {
 	err := metricsRegistry.Register("counter-for-broker-5", counter)
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	err = saramaprom.ExportMetrics(ctx, metricsRegistry, saramaprom.Options{
+	saramaprom.ExportMetrics(metricsRegistry, saramaprom.Options{
 		Namespace:          "test",
 		Subsystem:          "subsys",
 		PrometheusRegistry: promRegistry,
-		FlushInterval:      100 * time.Millisecond,
+		RefreshInterval:    100 * time.Millisecond,
 	})
 	require.NoError(t, err)
 
@@ -162,14 +149,11 @@ func TestHistogram(t *testing.T) {
 	}
 	gm.Update(10)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	err = saramaprom.ExportMetrics(ctx, metricsRegistry, saramaprom.Options{
+	saramaprom.ExportMetrics(metricsRegistry, saramaprom.Options{
 		Namespace:          "test",
 		Subsystem:          "subsys",
 		PrometheusRegistry: promRegistry,
-		FlushInterval:      100 * time.Millisecond,
+		RefreshInterval:    100 * time.Millisecond,
 	})
 	require.NoError(t, err)
 
@@ -225,13 +209,13 @@ func getMetricDetails(pr *prometheus.Registry, fullName string) []gaugeDetails {
 				case "GAUGE":
 					gd.gaugeValues = append(gd.gaugeValues, m.GetGauge().GetValue())
 				case "HISTOGRAM":
-					//TODO
-					//buckets := make(map[float64]uint64)
-					//m.GetHistogram().GetSampleSum()
-					//m.GetHistogram().GetSampleCount()
-					//for _, b := range m.GetHistogram().GetBucket() {
+					// TODO
+					// buckets := make(map[float64]uint64)
+					// m.GetHistogram().GetSampleSum()
+					// m.GetHistogram().GetSampleCount()
+					// for _, b := range m.GetHistogram().GetBucket() {
 					//	buckets[b.GetUpperBound()] = b.GetCumulativeCount()
-					//}
+					// }
 				}
 				ret = append(ret, gd)
 			}

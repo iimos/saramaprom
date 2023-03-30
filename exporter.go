@@ -12,14 +12,14 @@ import (
 )
 
 type exporter struct {
-	opt              Options
-	registry         MetricsRegistry
-	promRegistry     prometheus.Registerer
-	gauges           map[string]prometheus.Gauge
-	customMetrics    map[string]*customCollector
-	histogramBuckets []float64
-	timerBuckets     []float64
-	mutex            *sync.Mutex
+	opt                Options
+	registry           MetricsRegistry
+	promRegistry       prometheus.Registerer
+	gauges             map[string]prometheus.Gauge
+	customMetrics      map[string]*customCollector
+	histogramQuantiles []float64
+	timerQuantiles     []float64
+	mutex              *sync.Mutex
 }
 
 func (c *exporter) sanitizeName(key string) string {
@@ -41,9 +41,6 @@ func (c *exporter) createKey(name string) string {
 func (c *exporter) gaugeFromNameAndValue(name string, val float64) error {
 	shortName, labels, skip := c.metricNameAndLabels(name)
 	if skip {
-		if c.opt.Debug {
-			fmt.Printf("[saramaprom] skip metric %q because there is no broker or topic labels\n", name)
-		}
 		return nil
 	}
 
@@ -57,7 +54,6 @@ func (c *exporter) gaugeFromNameAndValue(name string, val float64) error {
 			Namespace: c.sanitizeName(c.opt.Namespace),
 			Subsystem: c.sanitizeName(c.opt.Subsystem),
 			Name:      c.sanitizeName(shortName),
-			Help:      shortName,
 		}, labelNames)
 
 		if err := c.promRegistry.Register(g); err != nil {
@@ -100,7 +96,6 @@ func (c *exporter) metricNameAndLabels(metricName string) (newName string, label
 	labels = map[string]string{
 		"broker": broker,
 		"topic":  topic,
-		"label":  c.opt.Label,
 	}
 	return newName, labels, false
 }
@@ -119,7 +114,7 @@ func parseMetricName(name string) (newName, broker, topic string) {
 	return name, "", ""
 }
 
-func (c *exporter) histogramFromNameAndMetric(name string, goMetric interface{}, buckets []float64) error {
+func (c *exporter) summaryFromNameAndMetric(name string, goMetric interface{}, quantiles []float64) error {
 	key := c.createKey(name)
 	collector, exists := c.customMetrics[key]
 	if !exists {
@@ -131,28 +126,25 @@ func (c *exporter) histogramFromNameAndMetric(name string, goMetric interface{},
 	var ps []float64
 	var count uint64
 	var sum float64
-	var typeName string
 
 	switch metric := goMetric.(type) {
 	case metrics.Histogram:
 		snapshot := metric.Snapshot()
-		ps = snapshot.Percentiles(buckets)
+		ps = snapshot.Percentiles(quantiles)
 		count = uint64(snapshot.Count())
 		sum = float64(snapshot.Sum())
-		typeName = "histogram"
 	case metrics.Timer:
 		snapshot := metric.Snapshot()
-		ps = snapshot.Percentiles(buckets)
+		ps = snapshot.Percentiles(quantiles)
 		count = uint64(snapshot.Count())
 		sum = float64(snapshot.Sum())
-		typeName = "timer"
 	default:
 		return fmt.Errorf("unexpected metric type %T", goMetric)
 	}
 
-	bucketVals := make(map[float64]uint64)
-	for ii, bucket := range buckets {
-		bucketVals[bucket] = uint64(ps[ii])
+	quantilesVals := make(map[float64]float64)
+	for i, quantile := range quantiles {
+		quantilesVals[quantile] = ps[i]
 	}
 
 	name, labels, skip := c.metricNameAndLabels(name)
@@ -164,27 +156,19 @@ func (c *exporter) histogramFromNameAndMetric(name string, goMetric interface{},
 		prometheus.BuildFQName(
 			c.sanitizeName(c.opt.Namespace),
 			c.sanitizeName(c.opt.Subsystem),
-			c.sanitizeName(name)+"_"+typeName,
+			c.sanitizeName(name),
 		),
 		c.sanitizeName(name),
 		nil,
 		labels,
 	)
 
-	hist, err := prometheus.NewConstHistogram(desc, count, sum, bucketVals)
-	if err != nil {
-		return err
-	}
-	c.mutex.Lock()
-	collector.metric = hist
-	c.mutex.Unlock()
+	collector.setMetric(prometheus.MustNewConstSummary(desc, count, sum, quantilesVals))
+
 	return nil
 }
 
 func (c *exporter) update() error {
-	if c.opt.Debug {
-		fmt.Print("[saramaprom] update()\n")
-	}
 	var err error
 	c.registry.Each(func(name string, i interface{}) {
 		switch metric := i.(type) {
@@ -193,31 +177,20 @@ func (c *exporter) update() error {
 		case metrics.Gauge:
 			err = c.gaugeFromNameAndValue(name, float64(metric.Value()))
 		case metrics.GaugeFloat64:
-			err = c.gaugeFromNameAndValue(name, float64(metric.Value()))
-		case metrics.Histogram: // sarama
-			samples := metric.Snapshot().Sample().Values()
-			if len(samples) > 0 {
-				lastSample := samples[len(samples)-1]
-				err = c.gaugeFromNameAndValue(name, float64(lastSample))
-			}
-			if err == nil {
-				err = c.histogramFromNameAndMetric(name, metric, c.histogramBuckets)
-			}
-		case metrics.Meter: // sarama
+			err = c.gaugeFromNameAndValue(name, metric.Value())
+		case metrics.Histogram:
+			err = c.summaryFromNameAndMetric(name, metric, c.histogramQuantiles)
+		case metrics.Meter:
 			lastSample := metric.Snapshot().Rate1()
-			err = c.gaugeFromNameAndValue(name, float64(lastSample))
+			err = c.gaugeFromNameAndValue(name, lastSample)
 		case metrics.Timer:
-			lastSample := metric.Snapshot().Rate1()
-			err = c.gaugeFromNameAndValue(name, float64(lastSample))
-			if err == nil {
-				err = c.histogramFromNameAndMetric(name, metric, c.timerBuckets)
-			}
+			err = c.summaryFromNameAndMetric(name, metric, c.timerQuantiles)
 		}
 	})
 	return err
 }
 
-// for collecting prometheus.constHistogram objects
+// customCollector is a collector of prometheus.constSummary objects.
 type customCollector struct {
 	prometheus.Collector
 
@@ -229,6 +202,12 @@ func newCustomCollector(mu *sync.Mutex) *customCollector {
 	return &customCollector{
 		mutex: mu,
 	}
+}
+
+func (c *customCollector) setMetric(metric prometheus.Metric) {
+	c.mutex.Lock()
+	c.metric = metric
+	c.mutex.Unlock()
 }
 
 func (c *customCollector) Collect(ch chan<- prometheus.Metric) {
