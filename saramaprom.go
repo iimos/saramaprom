@@ -43,7 +43,7 @@ func ExportMetrics(ctx context.Context, metricsRegistry MetricsRegistry, opt Opt
 	if opt.FlushInterval == 0 {
 		opt.FlushInterval = time.Second
 	}
-	if opt.OnError != nil {
+	if opt.OnError == nil {
 		opt.OnError = func(err error) {
 			panic(fmt.Errorf("saramaprom: %w", err))
 		}
