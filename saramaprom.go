@@ -19,7 +19,9 @@ type Options struct {
 	Namespace string
 	Subsystem string
 
-	// Label specifies value of "label" label. Default "".
+	// Label specifies value of "label" label. It is recomended
+	// to always set the label to avoid collisions between sarama
+	// instances. Default "".
 	Label string
 
 	// FlushInterval specifies interval between updating metrics. Default 1s.

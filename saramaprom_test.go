@@ -6,12 +6,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iimos/saramaprom"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/iimos/saramaprom"
 )
 
 func TestMetricCreation(t *testing.T) {
